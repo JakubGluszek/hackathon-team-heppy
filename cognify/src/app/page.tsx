@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { getSession } from "@/server/better-auth/server";
+import { SignOutButton } from "@/app/_components/sign-out-button";
 
 export default async function Home() {
   const session = await getSession();
@@ -9,11 +12,29 @@ export default async function Home() {
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Cognify
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">
-          {session
-            ? `Welcome back, ${session.user?.name ?? "User"}!`
-            : "Get started by signing in"}
-        </p>
+        {session ? (
+          <>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              Welcome back, {session.user?.name ?? "User"}!
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              Email: {session.user?.email}
+            </p>
+            <SignOutButton />
+          </>
+        ) : (
+          <>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              Get started by signing in
+            </p>
+            <Link
+              href="/login"
+              className="rounded-lg bg-gray-900 px-6 py-3 font-medium text-white transition hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200"
+            >
+              Go to Login
+            </Link>
+          </>
+        )}
       </div>
     </main>
   );
