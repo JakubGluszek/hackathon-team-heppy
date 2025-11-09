@@ -191,6 +191,114 @@ export async function extractTriplesFromChunk(
 }
 
 /**
+ * Parse triples incrementally from streaming text.
+ * Looks for complete triple objects in the accumulated content.
+ */
+function parseStreamingTriples(text: string): Triple[] {
+  const triples: Triple[] = [];
+
+  // Look for individual triple objects in the form: {"subject":"...","predicate":"...","object":"..."}
+  // Use a more forgiving regex that captures complete objects
+  const tripleRegex =
+    /\{\s*"subject"\s*:\s*"([^"]+)"\s*,\s*"predicate"\s*:\s*"([^"]+)"\s*,\s*"object"\s*:\s*"([^"]+)"\s*\}/g;
+
+  let match;
+  while ((match = tripleRegex.exec(text)) !== null) {
+    const triple = {
+      subject: match[1]?.trim() ?? "",
+      predicate: match[2]?.trim() ?? "",
+      object: match[3]?.trim() ?? "",
+    };
+
+    if (triple.subject && triple.predicate && triple.object) {
+      triples.push(triple);
+    }
+  }
+
+  return triples;
+}
+
+/**
+ * Extract triples from text using OpenAI streaming for real-time processing.
+ * Yields triples as they're discovered in the stream.
+ */
+async function* extractTriplesStreaming(text: string): AsyncGenerator<Triple> {
+  try {
+    console.log(
+      `[Pipeline] Starting streaming extraction (${text.length} chars)...`,
+    );
+    const startTime = Date.now();
+
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: TRIPLE_EXTRACTION_SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: getTripleExtractionUserPrompt(text),
+        },
+      ],
+      // IMPORTANT: Do NOT use response_format json_object - it blocks streaming!
+      temperature: 0.2,
+      max_tokens: 8192,
+      stream: true,
+    });
+
+    let accumulatedContent = "";
+    const yieldedTriples = new Set<string>(); // Track yielded triples to avoid duplicates
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        accumulatedContent += content;
+
+        // Try to parse complete triples from accumulated content
+        const foundTriples = parseStreamingTriples(accumulatedContent);
+
+        // Yield any new triples we haven't seen before
+        for (const triple of foundTriples) {
+          const tripleKey = `${triple.subject}|${triple.predicate}|${triple.object}`;
+
+          if (!yieldedTriples.has(tripleKey) && validateTriple(triple)) {
+            yieldedTriples.add(tripleKey);
+            console.log(
+              `[Pipeline] Yielding triple: ${triple.subject} -> ${triple.predicate} -> ${triple.object}`,
+            );
+            yield {
+              subject: triple.subject.trim(),
+              predicate: limitPredicateLength(
+                triple.predicate.trim(),
+                MAX_PREDICATE_WORDS,
+              ),
+              object: triple.object.trim(),
+            };
+          }
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(
+      `[Pipeline] Streaming completed in ${duration}ms, ${yieldedTriples.size} triples yielded`,
+    );
+  } catch (error) {
+    console.error("Error in streaming extraction:", error);
+    if (error instanceof Error) {
+      if (error.message.includes("rate_limit")) {
+        throw new Error("OpenAI rate limit exceeded. Please try again later.");
+      }
+      if (error.message.includes("timeout")) {
+        throw new Error("OpenAI request timed out. Please try again.");
+      }
+    }
+    throw error;
+  }
+}
+
+/**
  * Build a knowledge graph from text by extracting triples.
  * Yields streaming events as nodes and edges are discovered.
  */
@@ -219,36 +327,8 @@ export async function* buildGraphFromText(
       message: "Analyzing text and extracting relationships...",
     };
 
-    // Extract triples from the entire text at once
-    let triples: Triple[];
-    try {
-      triples = await extractTriplesFromChunk(text);
-      console.log(`[Pipeline] Extracted ${triples.length} triples total`);
-    } catch (error) {
-      // If it's a rate limit or other critical error, emit error event and stop
-      if (error instanceof Error) {
-        console.error(`[Pipeline] Critical error:`, error);
-        yield {
-          type: "error",
-          message: error.message,
-        };
-        return;
-      }
-      console.warn(`[Pipeline] Non-critical error, returning empty graph`);
-      yield {
-        type: "complete",
-        summary: { nodes: 0, edges: 0 },
-      };
-      return;
-    }
-
-    yield {
-      type: "status",
-      message: `Building graph from ${triples.length} relationships...`,
-    };
-
-    // Process each triple and stream nodes/edges
-    for (const triple of triples) {
+    // Stream triples as they're extracted
+    for await (const triple of extractTriplesStreaming(text)) {
       // Check hard cap
       if (totalNodesEmitted >= HARD_NODE_CAP) {
         yield {
