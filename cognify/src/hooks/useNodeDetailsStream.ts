@@ -27,6 +27,26 @@ export function useNodeDetailsStream(
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const hasStartedRef = useRef(false);
+  const currentNodeIdRef = useRef<string>(nodeId);
+
+  // Reset state when node changes
+  useEffect(() => {
+    if (currentNodeIdRef.current !== nodeId) {
+      console.log("[useNodeDetailsStream] Node changed, resetting state");
+      currentNodeIdRef.current = nodeId;
+      hasStartedRef.current = false;
+      setContent("");
+      setRelationships(null);
+      setError(null);
+      setIsStreaming(false);
+      
+      // Close any existing connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    }
+  }, [nodeId]);
 
   const startStream = () => {
     if (hasStartedRef.current || !graphId || !nodeId || !nodeLabel) return;

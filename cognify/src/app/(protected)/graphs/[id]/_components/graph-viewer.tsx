@@ -200,6 +200,21 @@ export function GraphViewer({ graphId, graphIcon, graphName }: GraphViewerProps)
     }
   };
 
+  // Memoized node color function to prevent setState during render
+  const getNodeColor = useCallback(
+    (node: any) => {
+      if (node.id === selectedNodeId) {
+        return "#3b82f6"; // Blue for selected
+      }
+      if (node.group === "root") {
+        return "#6366f1"; // Indigo for root
+      }
+      // Return default color based on group
+      return node.color ?? "#64748b"; // Default gray
+    },
+    [selectedNodeId],
+  );
+
   const handleNodeClick = useCallback(
     (node: any) => {
       // Skip root node
@@ -207,12 +222,6 @@ export function GraphViewer({ graphId, graphIcon, graphName }: GraphViewerProps)
 
       // Set selected node and open sheet
       selectNode(node.id as string, node.name as string);
-
-      // Center the clicked node
-      if (graphRef.current?.centerAt) {
-        graphRef.current.centerAt(node.x, node.y, 1000);
-        graphRef.current.zoom(4, 1000);
-      }
     },
     [selectNode],
   );
@@ -432,16 +441,7 @@ export function GraphViewer({ graphId, graphIcon, graphName }: GraphViewerProps)
               width={dimensions.width}
               height={dimensions.height}
               nodeLabel="name"
-              nodeColor={(node: any) => {
-                if (node.id === selectedNodeId) {
-                  return "#3b82f6"; // Blue for selected
-                }
-                if (node.group === "root") {
-                  return "#6366f1"; // Indigo for root
-                }
-                // Return default color based on group
-                return node.color ?? "#64748b"; // Default gray
-              }}
+              nodeColor={getNodeColor}
               nodeRelSize={1}
               onNodeClick={handleNodeClick}
               nodeCanvasObjectMode={() => "after"}

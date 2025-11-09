@@ -78,7 +78,10 @@ export function NodeDetailsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[600px] sm:max-w-[600px] overflow-y-auto">
+      <SheetContent 
+        key={selectedNodeId} 
+        className="w-[600px] sm:max-w-[600px] overflow-y-auto"
+      >
         <SheetHeader className="sticky top-0 bg-white">
           <SheetTitle>{selectedNodeLabel}</SheetTitle>
           <SheetDescription>
