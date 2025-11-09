@@ -3,7 +3,11 @@ import { db } from "@/server/db";
 import { graphs } from "@/server/db/schema";
 import { auth } from "@/server/better-auth";
 import { eq } from "drizzle-orm";
-import { generateNodeId } from "@/lib/graph-utils";
+import {
+  buildGraphFromText,
+  type GraphNode,
+  type GraphEdge,
+} from "@/lib/graph-pipeline";
 
 // Helper to send SSE event
 function sendEvent(
@@ -14,11 +18,6 @@ function sendEvent(
   const encoder = new TextEncoder();
   const message = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
   controller.enqueue(encoder.encode(message));
-}
-
-// Helper to delay (for stub data)
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function GET(request: NextRequest) {
@@ -80,92 +79,82 @@ export async function GET(request: NextRequest) {
     // 4. Create SSE stream
     const stream = new ReadableStream({
       async start(controller) {
+        // Maps to accumulate nodes and edges for final save
+        const nodesMap = new Map<string, GraphNode>();
+        const edgesMap = new Map<string, GraphEdge>();
+
         try {
-          // STUB IMPLEMENTATION - Replace with real pipeline in Phase 7
+          // Get the input text for processing
+          const inputText = graph.inputText;
 
-          // Send status update
-          sendEvent(controller, "status", {
-            message: "Starting graph generation...",
-          });
-          await delay(500);
+          if (!inputText) {
+            sendEvent(controller, "error", {
+              message: "No input text found for graph",
+            });
+            await db
+              .update(graphs)
+              .set({ status: "error" })
+              .where(eq(graphs.id, graphId));
+            controller.close();
+            return;
+          }
 
-          // Create stub nodes
-          const node1 = {
-            id: generateNodeId("biology"),
-            label: "biology",
-            group: "extracted",
-            weight: 1,
-          };
+          // Process the text and stream events
+          for await (const event of buildGraphFromText(inputText)) {
+            // Forward all events to the client
+            switch (event.type) {
+              case "status":
+                sendEvent(controller, "status", {
+                  message: event.message,
+                });
+                break;
 
-          const node2 = {
-            id: generateNodeId("cell"),
-            label: "cell",
-            group: "extracted",
-            weight: 1,
-          };
+              case "node":
+                // Add to map for deduplication
+                nodesMap.set(event.node.id, event.node);
+                sendEvent(controller, "node", { node: event.node });
+                break;
 
-          const node3 = {
-            id: generateNodeId("mitosis"),
-            label: "mitosis",
-            group: "extracted",
-            weight: 1,
-          };
+              case "edge":
+                // Add to map for deduplication
+                const edgeKey = `${event.edge.source}-${event.edge.relation}-${event.edge.target}`;
+                edgesMap.set(edgeKey, event.edge);
+                sendEvent(controller, "edge", { edge: event.edge });
+                break;
 
-          // Send nodes
-          sendEvent(controller, "node", { node: node1 });
-          await delay(300);
+              case "complete":
+                // Save final graph to database
+                const graphJson = {
+                  nodes: Array.from(nodesMap.values()),
+                  edges: Array.from(edgesMap.values()),
+                };
 
-          sendEvent(controller, "node", { node: node2 });
-          await delay(300);
+                await db
+                  .update(graphs)
+                  .set({
+                    status: "complete",
+                    graphJson,
+                  })
+                  .where(eq(graphs.id, graphId));
 
-          sendEvent(controller, "node", { node: node3 });
-          await delay(300);
+                sendEvent(controller, "complete", {
+                  summary: event.summary,
+                });
+                break;
 
-          // Send edges
-          const edge1 = {
-            source: node1.id,
-            target: node2.id,
-            relation: "studies",
-            type: "extracted",
-            confidence: 0.9,
-          };
+              case "error":
+                // Update graph status to error
+                await db
+                  .update(graphs)
+                  .set({ status: "error" })
+                  .where(eq(graphs.id, graphId));
 
-          const edge2 = {
-            source: node2.id,
-            target: node3.id,
-            relation: "undergoes",
-            type: "extracted",
-            confidence: 0.85,
-          };
-
-          sendEvent(controller, "edge", { edge: edge1 });
-          await delay(300);
-
-          sendEvent(controller, "edge", { edge: edge2 });
-          await delay(300);
-
-          // Create stub graph JSON
-          const graphJson = {
-            nodes: [node1, node2, node3],
-            edges: [edge1, edge2],
-          };
-
-          // Save to database
-          await db
-            .update(graphs)
-            .set({
-              status: "complete",
-              graphJson,
-            })
-            .where(eq(graphs.id, graphId));
-
-          // Send complete event
-          sendEvent(controller, "complete", {
-            summary: {
-              nodes: 3,
-              edges: 2,
-            },
-          });
+                sendEvent(controller, "error", {
+                  message: event.message,
+                });
+                break;
+            }
+          }
 
           controller.close();
         } catch (error) {
@@ -178,7 +167,10 @@ export async function GET(request: NextRequest) {
             .where(eq(graphs.id, graphId));
 
           sendEvent(controller, "error", {
-            message: "An error occurred during graph generation",
+            message:
+              error instanceof Error
+                ? error.message
+                : "An unexpected error occurred during graph generation",
           });
 
           controller.close();

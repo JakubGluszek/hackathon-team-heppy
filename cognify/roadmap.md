@@ -187,20 +187,20 @@ pnpm dev
 
 ### Tasks
 
-- [ ] Create `src/lib/graph-pipeline.ts`:
+- [x] Create `src/lib/graph-pipeline.ts`:
   - `extractTriplesFromChunk(chunk: string): Promise<Triple[]>` - call OpenAI with extraction prompt
-  - `buildGraphFromText(text: string): AsyncGenerator<StreamEvent>` - orchestrate chunking, extraction, emit events
+  - `buildGraphFromText(text: string): AsyncGenerator<StreamEvent>` - orchestrate extraction, emit events
   - Use robust JSON extraction (`extractJsonFromText`)
   - Validate all triples (subject, predicate, object present)
   - Enforce predicate length limit (3 words max)
   - Apply basic entity normalization
-- [ ] Update `src/app/api/graphs/stream/route.ts`:
+- [x] Update `src/app/api/graphs/stream/route.ts`:
   - Remove stub logic
   - Call `buildGraphFromText(inputText)` and forward events to SSE stream
   - Accumulate nodes/edges in Map for deduplication by ID
   - Save final `graphJson` on completion
-- [ ] Add error handling for LLM failures (rate limits, timeouts)
-- [ ] Implement node cap enforcement (300 soft warn, 500 hard stop)
+- [x] Add error handling for LLM failures (rate limits, timeouts)
+- [x] Implement node cap enforcement (300 soft warn, 500 hard stop)
 
 ### Validation
 
@@ -211,6 +211,25 @@ pnpm dev
 # Verify graph makes semantic sense
 # Check database: `graphJson` should contain full graph
 ```
+
+### Phase Notes
+
+**Status**: Complete (Date: 2025-11-09)
+
+**Implementation Details**:
+- Removed chunking entirely - process entire text in single LLM call for faster response
+- Single OpenAI call extracts all triples, then streams nodes/edges individually to client
+- Added comprehensive logging throughout pipeline for debugging
+- 30-second timeout on OpenAI client
+- Triples validated and filtered before streaming
+- Predicate length enforcement (3 words max)
+- Real-time deduplication of nodes and edges using Maps
+- Node caps: soft warning at 300, hard stop at 500
+- Error handling for rate limits and timeouts
+
+**Performance**: For ~800 word generated text, extraction takes ~3-5 seconds, then nodes/edges stream immediately.
+
+**Next**: Phase 8 (Optional Inference) or Phase 9 (UI Polish)
 
 ### Reference
 
