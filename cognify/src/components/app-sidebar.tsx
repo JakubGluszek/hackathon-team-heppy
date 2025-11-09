@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Brain } from "lucide-react"
+import { Brain, SendIcon, MessageSquare } from "lucide-react"
 import { NavFavorites } from "@/components/nav-favorites"
 import {
   Sidebar,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sidebar"
 import { api } from '@/trpc/react';
 import { UserMenu } from "@/app/_components/user-menu";
+import { NavSecondary } from './nav-secondary'
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: {
@@ -25,6 +26,19 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const { data: graphs, isLoading } = api.graphs.list.useQuery();
   
+  const secondaryItems = [
+    {
+      title: "Support",
+      url: "#",
+      icon: SendIcon,
+    },
+    {
+      title: "Feedback",
+      url: "#",
+      icon: MessageSquare,
+    },
+  ];
+  
   return (
     <Sidebar className="border-r-0" {...props}>
       <SidebarHeader>
@@ -35,6 +49,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <NavFavorites graphs={graphs ?? []} isLoading={isLoading} />
+        <NavSecondary items={secondaryItems} className="mt-auto" />
       </SidebarContent>
       {user && (
         <SidebarFooter>

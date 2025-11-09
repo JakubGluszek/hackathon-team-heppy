@@ -363,8 +363,6 @@ export function GraphViewer({ graphId, graphIcon, graphName }: GraphViewerProps)
           </div>
 
           <div className="flex items-center gap-3">
-            <Badge variant={getStatusColor()}>{status}</Badge>
-
             {status === "building" && (
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
