@@ -157,18 +157,18 @@ pnpm dev
 
 ### Tasks
 
-- [ ] Create `src/app/graphs/[id]/page.tsx`
-- [ ] Fetch graph metadata (name, status) via tRPC or direct fetch
-- [ ] Create `src/hooks/useGraphStream.ts`:
+- [x] Create `src/app/graphs/[id]/page.tsx`
+- [x] Fetch graph metadata (name, status) via tRPC or direct fetch
+- [x] Create `src/hooks/useGraphStream.ts`:
   - Accept `graphId`, return `{ nodes, edges, status, error }`
   - Use `EventSource` to connect to `/api/graphs/stream?graphId=...`
   - Parse SSE events and update state
   - Handle reconnection on error
-- [ ] Render `ForceGraph2D` from `react-force-graph-2d`:
+- [x] Render `ForceGraph2D` from `react-force-graph-2d`:
   - Pass `graphData={{ nodes, links: edges }}`
   - Configure node/link appearance
   - Add loading indicator while status is "building"
-- [ ] Add basic controls: "Reset View" button
+- [x] Add basic controls: "Reset View" button
 
 ### Validation
 
@@ -328,6 +328,49 @@ See `.cursor/context/kg-extraction-reference.mdc` for:
 ---
 
 ## Phase Notes
+
+### Phase 6 (Date: 2025-11-09)
+
+**Status**: Graph viewer with SSE streaming complete
+
+**Completed**:
+
+- Created `useGraphStream` hook:
+  - EventSource connection to `/api/graphs/stream`
+  - Parses SSE events (status, node, edge, complete, error)
+  - Real-time deduplication of nodes and edges
+  - Automatic reconnection handling
+  - Type-safe event parsing
+- Created graph viewer page (`/graphs/[id]`):
+  - Server-side graph metadata fetch with auth check
+  - Ownership verification
+  - Dynamic route with Next.js 15 async params
+- Created `GraphViewer` component:
+  - Dynamic import of ForceGraph2D (no SSR)
+  - Real-time graph rendering as nodes/edges stream in
+  - Responsive canvas sizing
+  - Custom node rendering with labels
+  - Directional arrows on edges
+  - Zoom controls (in, out, reset)
+  - Status indicators and progress bar
+  - Error handling with fallback UI
+  - Summary display on completion
+- Full-screen immersive graph experience
+- Beautiful loading states and transitions
+
+**Features**:
+
+- Live graph building animation
+- Node auto-coloring by group
+- Interactive pan and zoom
+- Edge labels with relations
+- Progress tracking (nodes count)
+- Header with back navigation
+- Status badges (building, complete, error)
+
+**Next**: Real LLM pipeline (Phase 7)
+
+---
 
 ### Phase 5 (Date: 2025-11-09)
 
