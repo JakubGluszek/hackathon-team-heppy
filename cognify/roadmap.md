@@ -130,14 +130,14 @@ curl -N http://localhost:3000/api/graphs/stream?graphId=... \
 
 ### Tasks
 
-- [ ] Update `src/app/page.tsx`:
+- [x] Update `src/app/page.tsx`:
   - Add create form (topic input OR file upload, name optional)
   - Add submit handler calling `/api/graphs/create`
   - On success, redirect to `/graphs/[graphId]`
-- [ ] Create tRPC router `src/server/api/routers/graphs.ts`:
+- [x] Create tRPC router `src/server/api/routers/graphs.ts`:
   - `list` procedure: fetch user's graphs ordered by `createdAt DESC`
-- [ ] Add graphs router to `src/server/api/root.ts`
-- [ ] Display graphs list on home page with links to `/graphs/[id]`
+- [x] Add graphs router to `src/server/api/root.ts`
+- [x] Display graphs list on home page with links to `/graphs/[id]`
 
 ### Validation
 
@@ -328,6 +328,42 @@ See `.cursor/context/kg-extraction-reference.mdc` for:
 ---
 
 ## Phase Notes
+
+### Phase 5 (Date: 2025-11-09)
+
+**Status**: Home page and graph list complete
+
+**Completed**:
+
+- Created `CreateGraphForm` component:
+  - Tabbed interface (topic vs upload)
+  - Topic input with AI generation
+  - Text area for file content upload (50k char validation)
+  - Optional name field
+  - Form validation and loading states
+  - Redirects to graph viewer on success
+- Created `GraphsList` component:
+  - Fetches graphs via tRPC
+  - Displays graph cards with metadata (name, type, status, timestamp)
+  - Delete functionality with confirmation
+  - Real-time updates via tRPC mutations
+  - Empty state handling
+- Updated home page with:
+  - Two-column layout (form + list)
+  - Auth guard (redirects to /login if not logged in)
+  - Header with user info and sign out
+  - Beautiful gradient background
+- Added Toaster component to layout for notifications
+
+**Architecture**:
+
+- Form uses direct fetch to REST `/api/graphs/create`
+- List uses tRPC `graphs.list` and `graphs.delete`
+- This follows the hybrid approach: REST for create/stream, tRPC for CRUD
+
+**Next**: Graph viewer with ForceGraph2D and SSE
+
+---
 
 ### Phase 2 (Date: 2025-11-09)
 
