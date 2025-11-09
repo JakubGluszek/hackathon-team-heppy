@@ -7,12 +7,22 @@ import { NavFavorites } from "@/components/nav-favorites"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { api } from '@/trpc/react';
+import { UserMenu } from "@/app/_components/user-menu";
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
+}
+
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const { data: graphs, isLoading } = api.graphs.list.useQuery();
   
   return (
@@ -26,6 +36,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavFavorites graphs={graphs ?? []} isLoading={isLoading} />
       </SidebarContent>
+      {user && (
+        <SidebarFooter>
+          <UserMenu user={user} />
+        </SidebarFooter>
+      )}
       <SidebarRail />
     </Sidebar>
   )

@@ -11,7 +11,6 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { Separator } from '@/components/ui/separator';
 import { getSession } from '@/server/better-auth/server';
 import { redirect } from 'next/navigation';
-import { SignOutButton } from '../_components/sign-out-button';
 
 const geist = Geist({
   subsets: ["latin"],
@@ -30,7 +29,7 @@ export default async function ProtectedLayout({
       <body>
         <TRPCReactProvider>
         <SidebarProvider>
-        <AppSidebar />
+        <AppSidebar user={session.user} />
           <SidebarInset>
           <header className="flex h-14 shrink-0 items-center gap-2 border-b">
           <div className="flex flex-1 items-center gap-2 px-3">
@@ -39,19 +38,6 @@ export default async function ProtectedLayout({
               orientation="vertical"
               className="mr-2 data-[orientation=vertical]:h-4"
             />
-          </div>
-          <div className="ml-auto px-3">
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium">
-                {session.user?.name ?? "User"}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                {session.user?.email}
-              </p>
-            </div>
-            <SignOutButton />
-          </div>
           </div>
         </header>
         <div className="flex flex-1 flex-col overflow-hidden min-h-0">

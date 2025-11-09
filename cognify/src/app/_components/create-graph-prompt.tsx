@@ -9,14 +9,13 @@ import {
   PromptInputToolbar,
   PromptInputTools,
   PromptInputSubmit,
-  PromptInputButton,
   PromptInputModelSelect,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
   PromptInputModelSelectContent,
   PromptInputModelSelectItem,
 } from "./ai-prompt-input";
-import { MicIcon, PaperclipIcon, SparklesIcon, FileTextIcon } from 'lucide-react';
+import { SparklesIcon, FileTextIcon } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
