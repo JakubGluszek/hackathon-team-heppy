@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,11 @@ export function GraphViewer({ graphId, graphName }: GraphViewerProps) {
   const graphRef = useRef<ForceGraphMethods<GraphNode, GraphEdge> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [showLabels, setShowLabels] = useState(false);
+  const [showEdgeLabels, setShowEdgeLabels] = useState(false);
+  
+  // Use ref instead of state to avoid re-renders on hover
+  const hoveredNodeRef = useRef<string | null>(null);
 
   const { nodes, edges, status, statusMessage, error, summary } =
     useGraphStream(graphId);
@@ -74,20 +79,24 @@ export function GraphViewer({ graphId, graphName }: GraphViewerProps) {
   }, []);
 
   // Transform data for react-force-graph
-  const graphData = {
-    nodes: nodes.map((node) => ({
-      id: node.id,
-      name: node.label,
-      val: node.weight || 1,
-      group: node.group,
-    })),
-    links: edges.map((edge) => ({
-      source: edge.source,
-      target: edge.target,
-      label: edge.relation,
-      type: edge.type,
-    })),
-  };
+  // Use useMemo to prevent unnecessary re-renders
+  const graphData = React.useMemo(
+    () => ({
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        name: node.label,
+        val: node.weight || 1,
+        group: node.group,
+      })),
+      links: edges.map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        label: edge.relation,
+        type: edge.type,
+      })),
+    }),
+    [nodes, edges],
+  );
 
   const handleZoomIn = () => {
     if (graphRef.current?.zoom) {
@@ -119,6 +128,124 @@ export function GraphViewer({ graphId, graphName }: GraphViewerProps) {
         return "outline";
     }
   };
+
+  // Memoized canvas rendering callbacks
+  const nodeCanvasObjectCallback = useCallback(
+    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const nodeData = node;
+      const label = nodeData.name as string;
+      const fontSize = 12 / globalScale;
+      const nodeSize = 8;
+      const isHovered = hoveredNodeRef.current === nodeData.id;
+
+      // Draw node circle
+      ctx.beginPath();
+      ctx.arc(nodeData.x ?? 0, nodeData.y ?? 0, nodeSize, 0, 2 * Math.PI);
+      ctx.fillStyle = (nodeData.color as string) ?? "#666";
+      ctx.fill();
+
+      // Add white border on hover
+      if (isHovered) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.lineWidth = 2 / globalScale;
+        ctx.stroke();
+      }
+
+      // Only draw label if showLabels is true OR node is hovered
+      if (showLabels || isHovered) {
+        ctx.font = `${fontSize}px Sans-Serif`;
+        const textWidth = ctx.measureText(label).width;
+        const bckgDimensions = [textWidth, fontSize].map(
+          (n) => n + fontSize * 0.2,
+        );
+
+        const labelX = nodeData.x ?? 0;
+        const labelY = (nodeData.y ?? 0) + nodeSize + fontSize * 0.8;
+
+        // Draw background rectangle
+        ctx.fillStyle = isHovered
+          ? "rgba(0, 0, 0, 0.85)"
+          : "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(
+          labelX - (bckgDimensions[0] ?? 0) / 2,
+          labelY - (bckgDimensions[1] ?? 0) / 2,
+          bckgDimensions[0] ?? 0,
+          bckgDimensions[1] ?? 0,
+        );
+
+        // Draw label text
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+        ctx.fillText(label, labelX, labelY);
+      }
+    },
+    [showLabels],
+  );
+
+  const nodePointerAreaPaintCallback = useCallback(
+    (node: any, color: string, ctx: CanvasRenderingContext2D) => {
+      ctx.fillStyle = color;
+      const nodeSize = 8;
+
+      // Draw larger circle for easier clicking
+      ctx.beginPath();
+      ctx.arc(node.x ?? 0, node.y ?? 0, nodeSize * 1.5, 0, 2 * Math.PI);
+      ctx.fill();
+    },
+    [],
+  );
+
+  const onNodeHoverCallback = useCallback((node: any) => {
+    hoveredNodeRef.current = node ? (node.id as string) : null;
+  }, []);
+
+  const linkCanvasObjectCallback = useCallback(
+    (link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      if (!showEdgeLabels) return;
+
+      const linkData = link;
+      const label = linkData.label as string;
+      if (!label) return;
+
+      const fontSize = 9 / globalScale;
+      ctx.font = `${fontSize}px Sans-Serif`;
+
+      // Calculate middle position
+      const start = {
+        x: linkData.source.x ?? 0,
+        y: linkData.source.y ?? 0,
+      };
+      const end = {
+        x: linkData.target.x ?? 0,
+        y: linkData.target.y ?? 0,
+      };
+      const middleX = start.x + (end.x - start.x) / 2;
+      const middleY = start.y + (end.y - start.y) / 2;
+
+      // Measure text
+      const textWidth = ctx.measureText(label).width;
+      const bckgDimensions = [textWidth, fontSize].map(
+        (n) => n + fontSize * 0.15,
+      );
+
+      // Draw background
+      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+      ctx.fillRect(
+        middleX - (bckgDimensions[0] ?? 0) / 2,
+        middleY - (bckgDimensions[1] ?? 0) / 2,
+        bckgDimensions[0] ?? 0,
+        bckgDimensions[1] ?? 0,
+      );
+
+      // Draw text
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(180, 180, 180, 0.95)";
+      ctx.fillText(label, middleX, middleY);
+    },
+    [showEdgeLabels],
+  );
 
   return (
     <div className="bg-background flex flex-col w-full h-full">
@@ -167,6 +294,23 @@ export function GraphViewer({ graphId, graphName }: GraphViewerProps) {
               Reset View
             </Button>
 
+            <div className="ml-4 flex items-center gap-2">
+              <Button
+                variant={showLabels ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowLabels(!showLabels)}
+              >
+                Node Labels
+              </Button>
+              <Button
+                variant={showEdgeLabels ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowEdgeLabels(!showEdgeLabels)}
+              >
+                Edge Labels
+              </Button>
+            </div>
+
             {status === "building" && nodes.length > 0 && (
               <div className="ml-auto flex items-center gap-2">
                 <Progress value={(nodes.length / 300) * 100} className="w-32" />
@@ -213,46 +357,35 @@ export function GraphViewer({ graphId, graphName }: GraphViewerProps) {
               height={dimensions.height}
               nodeLabel="name"
               nodeAutoColorBy="group"
-              nodeCanvasObject={(node, ctx, globalScale) => {
-                const nodeData = node;
-                const label = nodeData.name as string;
-                const fontSize = 12 / globalScale;
-                ctx.font = `${fontSize}px Sans-Serif`;
-
-                // Draw node circle
-                const nodeSize = (nodeData.val as number) ?? 4;
-                ctx.beginPath();
-                ctx.arc(
-                  nodeData.x ?? 0,
-                  nodeData.y ?? 0,
-                  nodeSize,
-                  0,
-                  2 * Math.PI,
-                );
-                ctx.fillStyle = (nodeData.color as string) ?? "#666";
-                ctx.fill();
-
-                // Draw label
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-                ctx.fillText(
-                  label,
-                  nodeData.x ?? 0,
-                  (nodeData.y ?? 0) + nodeSize + fontSize,
-                );
-              }}
+              nodeRelSize={8}
+              nodeCanvasObject={nodeCanvasObjectCallback}
+              nodePointerAreaPaint={nodePointerAreaPaintCallback}
+              onNodeHover={onNodeHoverCallback}
               linkLabel="label"
-              linkDirectionalArrowLength={3.5}
+              linkDirectionalArrowLength={4}
               linkDirectionalArrowRelPos={1}
-              linkCurvature={0.1}
-              linkColor={() => "rgba(150, 150, 150, 0.4)"}
-              linkWidth={1.5}
+              linkCurvature={0.15}
+              linkColor={() => "rgba(150, 150, 150, 0.3)"}
+              linkWidth={1}
+              linkCanvasObjectMode={() => (showEdgeLabels ? "after" : undefined)}
+              linkCanvasObject={linkCanvasObjectCallback}
               enableZoomInteraction={true}
               enablePanInteraction={true}
-              cooldownTime={3000}
-              d3AlphaDecay={0.02}
-              d3VelocityDecay={0.3}
+              enableNodeDrag={true}
+              cooldownTime={15000}
+              cooldownTicks={100}
+              onEngineStop={() => {
+                // Keep simulation warm to prevent restarts
+                if (graphRef.current) {
+                  graphRef.current.d3ReheatSimulation?.();
+                }
+              }}
+              d3AlphaMin={0.001}
+              d3AlphaDecay={0.0228}
+              d3VelocityDecay={0.4}
+              warmupTicks={100}
+              d3Force="charge"
+              d3ForceStrength={-120}
             />
           </div>
         )}
