@@ -24,13 +24,15 @@ export default function LoginPage() {
         provider: "google",
         callbackURL: "/",
       });
-      
-      if (result?.data && "redirect" in result.data && result.data.redirect) return;
-      
-      
+
+      if (result?.data && "redirect" in result.data && result.data.redirect)
+        return;
+
       if (result?.error) {
         console.error("Error signing in with Google:", result.error);
-        alert("Failed to sign in. Please check your Google OAuth configuration.");
+        alert(
+          "Failed to sign in. Please check your Google OAuth configuration.",
+        );
         setIsLoading(false);
       } else {
         console.warn("Unexpected response from signIn.social:", result);
@@ -47,14 +49,16 @@ export default function LoginPage() {
     <main className="flex min-h-screen flex-col items-center justify-center">
       <div className="container flex flex-col items-center justify-center gap-8 px-4 py-16">
         <div className="flex flex-col items-center gap-6 rounded-lg border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-3xl font-bold tracking-tight">Sign in to Cognify</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Sign in to Cognify
+          </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Use your Google account to continue
           </p>
           <button
             onClick={handleGoogleSignIn}
             disabled={isLoading}
-            className="flex items-center gap-3 rounded-lg bg-white px-6 py-3 font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 transition hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
+            className="flex items-center gap-3 rounded-lg bg-white px-6 py-3 font-medium text-gray-900 shadow-sm ring-1 ring-gray-300 transition ring-inset hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
           >
             <svg
               className="h-5 w-5"
@@ -86,4 +90,3 @@ export default function LoginPage() {
     </main>
   );
 }
-
